@@ -1,6 +1,5 @@
 import logging
 from functools import partial
-from pprint import pprint
 
 import redis
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -15,7 +14,15 @@ from telegram.ext import (
 )
 from environs import Env
 
-from moltin_tools import get_api_key, get_products, get_cart, add_product_to_cart, get_product, fetch_image
+from moltin_tools import (
+    get_api_key,
+    get_products,
+    get_cart,
+    add_product_to_cart,
+    get_product,
+    fetch_image,
+    remove_item_from_cart,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +123,47 @@ def handle_description(update: Update, context: CallbackContext, base_url, api_k
 
 
 def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> int:
+    query = update.callback_query
+    query.answer()
+    action, product_id = query['data'].split('|')
+    user_id = update.effective_chat.id
+    if action == 'del':
+        remove_item_from_cart(base_url, api_key, user_id, product_id)
+    cart = get_cart(base_url, api_key, user_id)
+    fish_names_ids = {}
+    total_cost = 0
+    items_info = []
+    for item in cart['data']:
+        item_name = item['name']
+        item_id = item['product_id']
+        fish_names_ids[item_name] = item_id
+        item_price = item['value']['amount']
+        item_price_formatted = f'{item_price / 100} $'
+        item_quantity = item['quantity']
+        item_cost = item_price * item_quantity
+        total_cost += item_cost
+        item_cost_formatted = f'{item_cost / 100} $'
+        items_info.append(
+            f'{item_name}\n{item_price_formatted} за кг\n{item_quantity} кг за {item_cost_formatted}\n\n'
+        )
+        message = f'{"".join(items_info)}\nСтоимость корзины {total_cost/100} $'
 
+        keyboard = [
+            [InlineKeyboardButton(f'Удалить {name} из корзины', callback_data=f'del|{product_id}')]
+            for name, product_id in fish_names_ids.items()
+        ]
+        keyboard.append(
+            [
+                InlineKeyboardButton('Меню', callback_data=str(MENU)),
+            ],
+        )
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        query.message.delete()
+        query.message.reply_text(
+            text=message,
+            reply_markup=reply_markup,
+        )
     return HANDLE_CART
 
 
@@ -161,7 +208,18 @@ def main():
                     partial(start_over, base_url=moltin_base_url, api_key=api_key),
                     pattern='^' + str(MENU) + '$'
                 ),
+                CallbackQueryHandler(
+                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key),
+                    pattern='^' + str(CART) + '$'
+                ),
                 CallbackQueryHandler(partial(handle_description, base_url=moltin_base_url, api_key=api_key))
+            ],
+            HANDLE_CART: [
+                CallbackQueryHandler(
+                    partial(start_over, base_url=moltin_base_url, api_key=api_key),
+                    pattern='^' + str(MENU) + '$'
+                ),
+                CallbackQueryHandler(partial(handle_cart, base_url=moltin_base_url, api_key=api_key))
             ]
         },
         fallbacks=[

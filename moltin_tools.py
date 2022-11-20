@@ -65,6 +65,14 @@ def fetch_image(base_url, api_key, image_id):
     return response.json()["data"]["link"]["href"]
 
 
+def remove_item_from_cart(base_url, api_key, user_id, product_id):
+    headers = {'Authorization': f'Bearer {api_key}'}
+    url = urljoin(base_url, f'/v2/carts/{user_id}/items/{product_id}')
+    response = requests.delete(url, headers=headers)
+    response.raise_for_status()
+
+
+
 def main():
     env = Env()
     env.read_env()
@@ -72,10 +80,8 @@ def main():
     moltin_client_secret = env('MOLTIN_CLIENT_SECRET')
     moltin_base_url = env('MOLTIN_BASE_URL')
     api_key = get_api_key(moltin_base_url, moltin_client_id, moltin_client_secret)
-    pprint(get_product(moltin_base_url, api_key, '1a836540-bed8-419a-95bb-bc31e76dfd49'))
+    pprint(get_cart(moltin_base_url, api_key, 'abc'))
 
 
 if __name__ == '__main__':
     main()
-
-
