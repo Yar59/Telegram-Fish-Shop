@@ -32,10 +32,11 @@ def add_product_to_cart(base_url, api_key, product_id, quantity, user_id):
         "data": {
             "type": "cart_item",
             "id": product_id,
-            "quantity": quantity,
+            "quantity": int(quantity),
         }
     }
     response = requests.post(url, headers=headers, json=payload)
+    pprint(response.json())
     response.raise_for_status()
     return response.json()
 
