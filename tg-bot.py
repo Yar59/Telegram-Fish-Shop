@@ -46,6 +46,11 @@ def start(update: Update, context: CallbackContext, base_url, api_key):
         [InlineKeyboardButton(product['attributes']['name'], callback_data=product['id'])]
         for product in products
     ]
+    keyboard.append(
+        [
+            InlineKeyboardButton('Корзина', callback_data=str(CART)),
+        ],
+    )
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(
         text='Показываем рыбов:',
@@ -60,14 +65,14 @@ def start_over(update: Update, context: CallbackContext, base_url, api_key) -> i
     products = get_products(base_url, api_key)
     user_id = update.effective_chat.id
     keyboard = [
-        [
-            [InlineKeyboardButton(product['attributes']['name'], callback_data=product['id'])]
-            for product in products
-        ],
-        [
-           InlineKeyboardButton('Корзина', callback_data=str(CART)),
-        ],
+        [InlineKeyboardButton(product['attributes']['name'], callback_data=product['id'])]
+        for product in products
     ]
+    keyboard.append(
+        [
+            InlineKeyboardButton('Корзина', callback_data=str(CART)),
+        ],
+    )
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.message.delete()
     query.message.reply_text(
@@ -125,9 +130,9 @@ def handle_description(update: Update, context: CallbackContext, base_url, api_k
 def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> int:
     query = update.callback_query
     query.answer()
-    action, product_id = query['data'].split('|')
     user_id = update.effective_chat.id
-    if action == 'del':
+    if '|' in query['data']:
+        action, product_id = query['data'].split('|')
         remove_item_from_cart(base_url, api_key, user_id, product_id)
     cart = get_cart(base_url, api_key, user_id)
     fish_names_ids = {}
@@ -135,7 +140,7 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> 
     items_info = []
     for item in cart['data']:
         item_name = item['name']
-        item_id = item['product_id']
+        item_id = item['id']
         fish_names_ids[item_name] = item_id
         item_price = item['value']['amount']
         item_price_formatted = f'{item_price / 100} $'
@@ -146,24 +151,23 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> 
         items_info.append(
             f'{item_name}\n{item_price_formatted} за кг\n{item_quantity} кг за {item_cost_formatted}\n\n'
         )
-        message = f'{"".join(items_info)}\nСтоимость корзины {total_cost/100} $'
+    message = f'{"".join(items_info)}\nСтоимость корзины {total_cost/100} $'
+    keyboard = [
+        [InlineKeyboardButton(f'Удалить {name} из корзины', callback_data=f'del|{product_id}')]
+        for name, product_id in fish_names_ids.items()
+    ]
+    keyboard.append(
+        [
+            InlineKeyboardButton('Меню', callback_data=str(MENU)),
+        ],
+    )
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-        keyboard = [
-            [InlineKeyboardButton(f'Удалить {name} из корзины', callback_data=f'del|{product_id}')]
-            for name, product_id in fish_names_ids.items()
-        ]
-        keyboard.append(
-            [
-                InlineKeyboardButton('Меню', callback_data=str(MENU)),
-            ],
-        )
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        query.message.delete()
-        query.message.reply_text(
-            text=message,
-            reply_markup=reply_markup,
-        )
+    query.message.delete()
+    query.message.reply_text(
+        text=message,
+        reply_markup=reply_markup,
+    )
     return HANDLE_CART
 
 
@@ -202,7 +206,13 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', partial(start, base_url=moltin_base_url, api_key=api_key))],
         states={
-            HANDLE_MENU: [CallbackQueryHandler(partial(handle_menu, base_url=moltin_base_url, api_key=api_key))],
+            HANDLE_MENU: [
+                CallbackQueryHandler(
+                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key),
+                    pattern='^' + str(CART) + '$'
+                ),
+                CallbackQueryHandler(partial(handle_menu, base_url=moltin_base_url, api_key=api_key))
+            ],
             HANDLE_DESCRIPTION: [
                 CallbackQueryHandler(
                     partial(start_over, base_url=moltin_base_url, api_key=api_key),

@@ -36,7 +36,6 @@ def add_product_to_cart(base_url, api_key, product_id, quantity, user_id):
         }
     }
     response = requests.post(url, headers=headers, json=payload)
-    pprint(response.json())
     response.raise_for_status()
     return response.json()
 
@@ -69,8 +68,8 @@ def remove_item_from_cart(base_url, api_key, user_id, product_id):
     headers = {'Authorization': f'Bearer {api_key}'}
     url = urljoin(base_url, f'/v2/carts/{user_id}/items/{product_id}')
     response = requests.delete(url, headers=headers)
+    pprint(response.json())
     response.raise_for_status()
-
 
 
 def main():
