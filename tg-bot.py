@@ -30,16 +30,27 @@ logger = logging.getLogger(__name__)
     START,
     HANDLE_MENU,
     HANDLE_DESCRIPTION,
-    HANDLE_CART
-) = range(4)
+    HANDLE_CART,
+    WAITING_EMAIL,
+) = range(5)
 (
     MENU,
     DESCRIPTION,
     CART,
-) = range(3)
+    ORDER,
+) = range(4)
 
 
-def start(update: Update, context: CallbackContext, base_url, api_key):
+def get_state_after_reload(update: Update, context: CallbackContext, redis_db):
+    query = update.callback_query
+    if query:
+        query.answer()
+    user_id = update.effective_chat.id
+    current_state = int(redis_db.get(user_id))
+    return current_state
+
+
+def start(update: Update, context: CallbackContext, base_url, api_key, redis_db):
     products = get_products(base_url, api_key)
     user_id = update.effective_chat.id
     keyboard = [
@@ -56,10 +67,12 @@ def start(update: Update, context: CallbackContext, base_url, api_key):
         text='Показываем рыбов:',
         reply_markup=reply_markup
     )
-    return HANDLE_MENU
+    next_state = HANDLE_MENU
+    redis_db.set(user_id, next_state)
+    return next_state
 
 
-def start_over(update: Update, context: CallbackContext, base_url, api_key) -> int:
+def start_over(update: Update, context: CallbackContext, base_url, api_key, redis_db) -> int:
     query = update.callback_query
     query.answer()
     products = get_products(base_url, api_key)
@@ -79,19 +92,25 @@ def start_over(update: Update, context: CallbackContext, base_url, api_key) -> i
         text='Показываем рыбов:',
         reply_markup=reply_markup
     )
-    return HANDLE_MENU
+    next_state = HANDLE_MENU
+    redis_db.set(user_id, next_state)
+    return next_state
 
 
-def cancel(update: Update, context: CallbackContext) -> int:
+def cancel(update: Update, context: CallbackContext, redis_db) -> int:
+    user_id = update.effective_chat.id
     update.message.reply_text(
         'Надеюсь тебе понравился наш магазин!'
     )
-    return ConversationHandler.END
+    next_state = ConversationHandler.END
+    redis_db.set(user_id, next_state)
+    return next_state
 
 
-def handle_menu(update: Update, context: CallbackContext, base_url, api_key) -> int:
+def handle_menu(update: Update, context: CallbackContext, base_url, api_key, redis_db) -> int:
     query = update.callback_query
     query.answer()
+    user_id = update.effective_chat.id
     product_id = query['data']
     product = get_product(base_url, api_key, product_id)
     image_link = fetch_image(base_url, api_key, product['relationships']['main_image']['data']['id'])
@@ -115,19 +134,23 @@ def handle_menu(update: Update, context: CallbackContext, base_url, api_key) -> 
         caption=message,
         reply_markup=reply_markup,
     )
-    return HANDLE_DESCRIPTION
+    next_state = HANDLE_DESCRIPTION
+    redis_db.set(user_id, next_state)
+    return next_state
 
 
-def handle_description(update: Update, context: CallbackContext, base_url, api_key) -> int:
+def handle_description(update: Update, context: CallbackContext, base_url, api_key, redis_db) -> int:
     query = update.callback_query
     query.answer()
     quantity, product_id = query['data'].split('|')
     user_id = update.effective_chat.id
     add_product_to_cart(base_url, api_key, product_id, quantity, user_id)
-    return HANDLE_DESCRIPTION
+    next_state = HANDLE_DESCRIPTION
+    redis_db.set(user_id, next_state)
+    return next_state
 
 
-def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> int:
+def handle_cart(update: Update, context: CallbackContext, base_url, api_key, redis_db) -> int:
     query = update.callback_query
     query.answer()
     user_id = update.effective_chat.id
@@ -159,6 +182,7 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> 
     keyboard.append(
         [
             InlineKeyboardButton('Меню', callback_data=str(MENU)),
+            InlineKeyboardButton('Оформить заказ', callback_data=str(ORDER)),
         ],
     )
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -168,7 +192,52 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> 
         text=message,
         reply_markup=reply_markup,
     )
-    return HANDLE_CART
+    next_state = HANDLE_CART
+    redis_db.set(user_id, next_state)
+    return next_state
+
+
+def handle_order(update: Update, context: CallbackContext, base_url, api_key, redis_db) -> int:
+    query = update.callback_query
+    query.answer()
+    user_id = update.effective_chat.id
+    if query['data'] == str(ORDER):
+        message = 'Пришлите, пожалуйста, вашу электронную почту.'
+
+    keyboard = [
+        InlineKeyboardButton('Меню', callback_data=str(MENU)),
+        InlineKeyboardButton('Корзина', callback_data=str(CART)),
+    ],
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.message.delete()
+    query.message.reply_text(
+        text=message,
+        reply_markup=reply_markup,
+    )
+    next_state = WAITING_EMAIL
+    redis_db.set(user_id, next_state)
+    return next_state
+
+
+def handle_email(update: Update, context: CallbackContext, base_url, api_key, redis_db) -> int:
+    user_id = update.effective_chat.id
+    if '@' in update.message.text:
+        customer_email = update.message.text.strip()
+        message = f'Записал Вашу почту {customer_email}'
+        update.message.reply_text(
+            text=message,
+        )
+        next_state = ConversationHandler.END
+        redis_db.set(user_id, next_state)
+        return next_state
+    else:
+        message = 'Это не похоже на почту, попробуйте еще раз.'
+        update.message.reply_text(
+            text=message,
+        )
+        next_state = WAITING_EMAIL
+        redis_db.set(user_id, next_state)
+        return next_state
 
 
 def main():
@@ -204,37 +273,65 @@ def main():
     dispatcher = updater.dispatcher
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', partial(start, base_url=moltin_base_url, api_key=api_key))],
+        entry_points=[
+            CommandHandler(
+                'start',
+                partial(start, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db)
+            ),
+            CallbackQueryHandler(partial(get_state_after_reload, redis_db=redis_db)),
+            MessageHandler(Filters.text, partial(get_state_after_reload, redis_db=redis_db)),
+        ],
         states={
             HANDLE_MENU: [
                 CallbackQueryHandler(
-                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key),
+                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
                     pattern='^' + str(CART) + '$'
                 ),
-                CallbackQueryHandler(partial(handle_menu, base_url=moltin_base_url, api_key=api_key))
+                CallbackQueryHandler(
+                    partial(handle_menu, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db)
+                )
             ],
             HANDLE_DESCRIPTION: [
                 CallbackQueryHandler(
-                    partial(start_over, base_url=moltin_base_url, api_key=api_key),
+                    partial(start_over, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
                     pattern='^' + str(MENU) + '$'
                 ),
                 CallbackQueryHandler(
-                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key),
+                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
                     pattern='^' + str(CART) + '$'
                 ),
-                CallbackQueryHandler(partial(handle_description, base_url=moltin_base_url, api_key=api_key))
+                CallbackQueryHandler(
+                    partial(handle_description, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db)
+                )
             ],
             HANDLE_CART: [
                 CallbackQueryHandler(
-                    partial(start_over, base_url=moltin_base_url, api_key=api_key),
+                    partial(start_over, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
                     pattern='^' + str(MENU) + '$'
                 ),
-                CallbackQueryHandler(partial(handle_cart, base_url=moltin_base_url, api_key=api_key))
+                CallbackQueryHandler(
+                    partial(handle_order, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
+                    pattern='^' + str(ORDER) + '$'
+                ),
+                CallbackQueryHandler(
+                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db)
+                )
+            ],
+            WAITING_EMAIL: [
+                CallbackQueryHandler(
+                    partial(start_over, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
+                    pattern='^' + str(MENU) + '$'
+                ),
+                CallbackQueryHandler(
+                    partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
+                    pattern='^' + str(CART) + '$'
+                ),
+                MessageHandler(Filters.text, partial(handle_email, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db))
             ]
         },
         fallbacks=[
-            CommandHandler('cancel', cancel),
-            CommandHandler('start', cancel),
+            CommandHandler('cancel', partial(cancel, redis_db=redis_db)),
+            CommandHandler('start', partial(cancel, redis_db=redis_db)),
         ],
     )
 
