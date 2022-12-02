@@ -22,6 +22,7 @@ from moltin_tools import (
     get_product,
     fetch_image,
     remove_item_from_cart,
+    create_customer
 )
 
 logger = logging.getLogger(__name__)
@@ -227,6 +228,7 @@ def handle_email(update: Update, context: CallbackContext, base_url, api_key, re
         update.message.reply_text(
             text=message,
         )
+        create_customer(base_url, api_key, user_id, message)
         next_state = ConversationHandler.END
         redis_db.set(user_id, next_state)
         return next_state
