@@ -1,20 +1,31 @@
-import os
-from pprint import pprint
+from datetime import datetime
 from urllib.parse import urljoin
+
 import requests
-from environs import Env
+
+_api_key = None
+_expires = None
 
 
 def get_api_key(base_url, client_id, client_secret):
+    global _api_key
+    global _expires
     url = urljoin(base_url, '/oauth/access_token')
     payload = {
         'client_id': client_id,
         'client_secret': client_secret,
         'grant_type': 'client_credentials',
     }
-    response = requests.post(url, data=payload)
-    response.raise_for_status()
-    return response.json()['access_token']
+    current_time = datetime.now()
+    timestamp = int(datetime.timestamp(current_time))
+
+    if timestamp > _expires:
+        response = requests.post(url, data=payload)
+        response.raise_for_status()
+        _api_key = response.json()['access_token']
+        _expires = response.json()['expires']
+
+    return _api_key
 
 
 def get_products(base_url, api_key):
@@ -68,19 +79,42 @@ def remove_item_from_cart(base_url, api_key, user_id, product_id):
     headers = {'Authorization': f'Bearer {api_key}'}
     url = urljoin(base_url, f'/v2/carts/{user_id}/items/{product_id}')
     response = requests.delete(url, headers=headers)
-    pprint(response.json())
     response.raise_for_status()
 
 
-def main():
-    env = Env()
-    env.read_env()
-    moltin_client_id = env('MOLTIN_CLIENT_ID')
-    moltin_client_secret = env('MOLTIN_CLIENT_SECRET')
-    moltin_base_url = env('MOLTIN_BASE_URL')
-    api_key = get_api_key(moltin_base_url, moltin_client_id, moltin_client_secret)
-    pprint(get_cart(moltin_base_url, api_key, 'abc'))
+def create_customer(base_url, api_key, user_id, email):
+    headers = {'Authorization': f'Bearer {api_key}'}
+    url = urljoin(base_url, '/v2/customers')
+    payload = {
+        "data": {
+            "type": "customer",
+            "name": user_id,
+            "email": email,
+        }
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+    return response.json()['data']['id']
 
 
-if __name__ == '__main__':
-    main()
+def get_customer(base_url, api_key, customer_id):
+    headers = {'Authorization': f'Bearer {api_key}'}
+    url = urljoin(base_url, f'/v2/customers/{customer_id}')
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+
+def update_customer(base_url, api_key, customer_id, email):
+    headers = {'Authorization': f'Bearer {api_key}'}
+    url = urljoin(base_url, f'/v2/customers/{customer_id}')
+    payload = {
+        "data": {
+            "type": "customer",
+            "email": email,
+        }
+    }
+    response = requests.put(url, headers=headers, json=payload)
+    response.raise_for_status()
+    return response.json()
+
