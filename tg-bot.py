@@ -88,11 +88,11 @@ def start_over(update: Update, context: CallbackContext, base_url, api_key, redi
         ],
     )
     reply_markup = InlineKeyboardMarkup(keyboard)
-    query.message.delete()
     query.message.reply_text(
         text='Показываем рыбов:',
         reply_markup=reply_markup
     )
+    query.message.delete()
     next_state = HANDLE_MENU
     redis_db.set(user_id, next_state)
     return next_state
@@ -129,12 +129,12 @@ def handle_menu(update: Update, context: CallbackContext, base_url, api_key, red
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    query.message.delete()
     query.message.reply_photo(
         photo=image_link,
         caption=message,
         reply_markup=reply_markup,
     )
+    query.message.delete()
     next_state = HANDLE_DESCRIPTION
     redis_db.set(user_id, next_state)
     return next_state
@@ -188,11 +188,11 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key, red
     )
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    query.message.delete()
     query.message.reply_text(
         text=message,
         reply_markup=reply_markup,
     )
+    query.message.delete()
     next_state = HANDLE_CART
     redis_db.set(user_id, next_state)
     return next_state
@@ -210,11 +210,11 @@ def handle_order(update: Update, context: CallbackContext, base_url, api_key, re
         InlineKeyboardButton('Корзина', callback_data=str(CART)),
     ],
     reply_markup = InlineKeyboardMarkup(keyboard)
-    query.message.delete()
     query.message.reply_text(
         text=message,
         reply_markup=reply_markup,
     )
+    query.message.delete()
     next_state = WAITING_EMAIL
     redis_db.set(user_id, next_state)
     return next_state
