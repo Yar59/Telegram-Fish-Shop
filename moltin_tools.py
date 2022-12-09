@@ -18,14 +18,15 @@ def get_api_key(base_url, client_id, client_secret):
     }
     current_time = datetime.now()
     timestamp = int(datetime.timestamp(current_time))
+    if _expires:
+        if timestamp < _expires:
+            return _api_key
 
-    if timestamp > _expires:
-        response = requests.post(url, data=payload)
-        response.raise_for_status()
-        token_params = response.json()
-        _api_key = token_params['access_token']
-        _expires = token_params['expires']
-
+    response = requests.post(url, data=payload)
+    response.raise_for_status()
+    token_params = response.json()
+    _api_key = token_params['access_token']
+    _expires = token_params['expires']
     return _api_key
 
 
