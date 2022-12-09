@@ -287,7 +287,7 @@ def main():
             HANDLE_MENU: [
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
-                    pattern='^' + str(CART) + '$'
+                    pattern=f'^{CART}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_menu, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db)
@@ -296,11 +296,11 @@ def main():
             HANDLE_DESCRIPTION: [
                 CallbackQueryHandler(
                     partial(start_over, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
-                    pattern='^' + str(MENU) + '$'
+                    pattern=f'^{MENU}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
-                    pattern='^' + str(CART) + '$'
+                    pattern=f'^{CART}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_description, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db)
@@ -309,11 +309,11 @@ def main():
             HANDLE_CART: [
                 CallbackQueryHandler(
                     partial(start_over, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
-                    pattern='^' + str(MENU) + '$'
+                    pattern=f'^{MENU}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_order, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
-                    pattern='^' + str(ORDER) + '$'
+                    pattern=f'^{ORDER}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db)
@@ -322,11 +322,11 @@ def main():
             WAITING_EMAIL: [
                 CallbackQueryHandler(
                     partial(start_over, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
-                    pattern='^' + str(MENU) + '$'
+                    pattern=f'^{MENU}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db),
-                    pattern='^' + str(CART) + '$'
+                    pattern=f'^{CART}$'
                 ),
                 MessageHandler(Filters.text, partial(handle_email, base_url=moltin_base_url, api_key=api_key, redis_db=redis_db))
             ]
