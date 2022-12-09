@@ -1,3 +1,4 @@
+import enum
 import logging
 from textwrap import dedent
 from functools import partial
@@ -29,24 +30,28 @@ from moltin_tools import (
 
 logger = logging.getLogger(__name__)
 
-(
-    START,
-    HANDLE_MENU,
-    HANDLE_DESCRIPTION,
-    HANDLE_CART,
-    WAITING_EMAIL,
-) = range(5)
-(
-    MENU,
-    DESCRIPTION,
-    CART,
-    ORDER,
-) = range(4)
+
+class States(enum.Enum):
+    (
+        start,
+        handle_menu,
+        handle_description,
+        handle_cart,
+        waiting_email,
+    ) = range(5)
+
+
+class Transitions(enum.Enum):
+    (
+        menu,
+        description,
+        cart,
+        order,
+    ) = range(4)
 
 
 def start(update: Update, context: CallbackContext, base_url, api_key):
     products = get_products(base_url, api_key)
-    user_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton(product['attributes']['name'], callback_data=product['id'])]
         for product in products
@@ -61,22 +66,20 @@ def start(update: Update, context: CallbackContext, base_url, api_key):
         text='Показываем рыбов:',
         reply_markup=reply_markup
     )
-    next_state = HANDLE_MENU
-    return next_state
+    return States.handle_menu
 
 
 def start_over(update: Update, context: CallbackContext, base_url, api_key) -> int:
     query = update.callback_query
     query.answer()
     products = get_products(base_url, api_key)
-    user_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton(product['attributes']['name'], callback_data=product['id'])]
         for product in products
     ]
     keyboard.append(
         [
-            InlineKeyboardButton('Корзина', callback_data=str(CART)),
+            InlineKeyboardButton('Корзина', callback_data=str(Transitions.cart)),
         ],
     )
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -85,8 +88,8 @@ def start_over(update: Update, context: CallbackContext, base_url, api_key) -> i
         reply_markup=reply_markup
     )
     query.message.delete()
-    next_state = HANDLE_MENU
-    return next_state
+
+    return States.handle_menu
 
 
 def cancel(update: Update, context: CallbackContext) -> int:
@@ -94,8 +97,8 @@ def cancel(update: Update, context: CallbackContext) -> int:
     update.message.reply_text(
         'Надеюсь тебе понравился наш магазин!'
     )
-    next_state = ConversationHandler.END
-    return next_state
+
+    return ConversationHandler.END
 
 
 def handle_menu(update: Update, context: CallbackContext, base_url, api_key) -> int:
@@ -117,8 +120,8 @@ def handle_menu(update: Update, context: CallbackContext, base_url, api_key) -> 
             InlineKeyboardButton('10 кг', callback_data=f'10|{product_id}'),
         ],
         [
-            InlineKeyboardButton('Корзина', callback_data=str(CART)),
-            InlineKeyboardButton('Назад', callback_data=str(MENU)),
+            InlineKeyboardButton('Корзина', callback_data=str(Transitions.cart)),
+            InlineKeyboardButton('Назад', callback_data=str(Transitions.menu)),
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -128,8 +131,8 @@ def handle_menu(update: Update, context: CallbackContext, base_url, api_key) -> 
         reply_markup=reply_markup,
     )
     query.message.delete()
-    next_state = HANDLE_DESCRIPTION
-    return next_state
+
+    return States.handle_description
 
 
 def handle_description(update: Update, context: CallbackContext, base_url, api_key) -> int:
@@ -138,8 +141,8 @@ def handle_description(update: Update, context: CallbackContext, base_url, api_k
     quantity, product_id = query['data'].split('|')
     user_id = update.effective_chat.id
     add_product_to_cart(base_url, api_key, product_id, quantity, user_id)
-    next_state = HANDLE_DESCRIPTION
-    return next_state
+
+    return States.handle_description
 
 
 def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> int:
@@ -177,8 +180,8 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> 
     ]
     keyboard.append(
         [
-            InlineKeyboardButton('Меню', callback_data=str(MENU)),
-            InlineKeyboardButton('Оформить заказ', callback_data=str(ORDER)),
+            InlineKeyboardButton('Меню', callback_data=str(Transitions.menu)),
+            InlineKeyboardButton('Оформить заказ', callback_data=str(Transitions.order)),
         ],
     )
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -188,20 +191,20 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key) -> 
         reply_markup=reply_markup,
     )
     query.message.delete()
-    next_state = HANDLE_CART
-    return next_state
+
+    return States.handle_cart
 
 
 def handle_order(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
-    user_id = update.effective_chat.id
+
     if query['data'] == str(ORDER):
         message = 'Пришлите, пожалуйста, вашу электронную почту.'
 
     keyboard = [
-        InlineKeyboardButton('Меню', callback_data=str(MENU)),
-        InlineKeyboardButton('Корзина', callback_data=str(CART)),
+        InlineKeyboardButton('Меню', callback_data=str(Transitions.menu)),
+        InlineKeyboardButton('Корзина', callback_data=str(Transitions.cart)),
     ],
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.message.reply_text(
@@ -209,9 +212,8 @@ def handle_order(update: Update, context: CallbackContext) -> int:
         reply_markup=reply_markup,
     )
     query.message.delete()
-    next_state = WAITING_EMAIL
 
-    return next_state
+    return States.waiting_email
 
 
 def handle_email(update: Update, context: CallbackContext, base_url, api_key) -> int:
@@ -230,8 +232,8 @@ def handle_email(update: Update, context: CallbackContext, base_url, api_key) ->
         update.message.reply_text(
             text=message,
         )
-        next_state = WAITING_EMAIL
-        return next_state
+
+        return States.waiting_email
 
 
 def main():
@@ -274,49 +276,49 @@ def main():
             ),
         ],
         states={
-            HANDLE_MENU: [
+            States.handle_menu: [
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key),
-                    pattern=f'^{CART}$'
+                    pattern=f'^{Transitions.cart}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_menu, base_url=moltin_base_url, api_key=api_key)
                 )
             ],
-            HANDLE_DESCRIPTION: [
+            States.handle_description: [
                 CallbackQueryHandler(
                     partial(start_over, base_url=moltin_base_url, api_key=api_key),
-                    pattern=f'^{MENU}$'
+                    pattern=f'^{Transitions.menu}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key),
-                    pattern=f'^{CART}$'
+                    pattern=f'^{Transitions.cart}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_description, base_url=moltin_base_url, api_key=api_key)
                 )
             ],
-            HANDLE_CART: [
+            States.handle_cart: [
                 CallbackQueryHandler(
                     partial(start_over, base_url=moltin_base_url, api_key=api_key),
-                    pattern=f'^{MENU}$'
+                    pattern=f'^{Transitions.menu}$'
                 ),
                 CallbackQueryHandler(
                     handle_order,
-                    pattern=f'^{ORDER}$'
+                    pattern=f'^{Transitions.order}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key)
                 )
             ],
-            WAITING_EMAIL: [
+            States.waiting_email: [
                 CallbackQueryHandler(
                     partial(start_over, base_url=moltin_base_url, api_key=api_key),
-                    pattern=f'^{MENU}$'
+                    pattern=f'^{Transitions.menu}$'
                 ),
                 CallbackQueryHandler(
                     partial(handle_cart, base_url=moltin_base_url, api_key=api_key),
-                    pattern=f'^{CART}$'
+                    pattern=f'^{Transitions.cart}$'
                 ),
                 MessageHandler(Filters.text, partial(handle_email, base_url=moltin_base_url, api_key=api_key))
             ]
