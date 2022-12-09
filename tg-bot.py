@@ -1,4 +1,5 @@
 import logging
+from textwrap import dedent
 from functools import partial
 
 import redis
@@ -115,8 +116,11 @@ def handle_menu(update: Update, context: CallbackContext, base_url, api_key, red
     product_id = query['data']
     product = get_product(base_url, api_key, product_id)
     image_link = fetch_image(base_url, api_key, product['relationships']['main_image']['data']['id'])
-    message = f'{product["attributes"]["name"]}\n{product["attributes"]["description"]}\n' \
-              f'Цена за кг: {product["meta"]["display_price"]["with_tax"]["formatted"]}'
+    message = dedent(f'''
+        {product["attributes"]["name"]}
+        {product["attributes"]["description"]}
+        Цена за кг: {product["meta"]["display_price"]["with_tax"]["formatted"]}
+    ''')
     keyboard = [
         [
             InlineKeyboardButton('1 кг', callback_data=f'1|{product_id}'),
@@ -173,7 +177,11 @@ def handle_cart(update: Update, context: CallbackContext, base_url, api_key, red
         total_cost += item_cost
         item_cost_formatted = f'{item_cost / 100} $'
         items_info.append(
-            f'{item_name}\n{item_price_formatted} за кг\n{item_quantity} кг за {item_cost_formatted}\n\n'
+            dedent(f'''
+                {item_name}
+                {item_price_formatted} за кг
+                {item_quantity} кг за {item_cost_formatted}
+            ''')
         )
     message = f'{"".join(items_info)}\nСтоимость корзины {total_cost/100} $'
     keyboard = [
