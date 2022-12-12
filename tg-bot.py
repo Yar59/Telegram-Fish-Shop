@@ -46,28 +46,9 @@ class Transitions(Enum):
     order = auto()
 
 
-def start(update: Update, context: CallbackContext, base_url, api_key):
-    products = get_products(base_url, api_key)
-    keyboard = [
-        [InlineKeyboardButton(product['attributes']['name'], callback_data=product['id'])]
-        for product in products
-    ]
-    keyboard.append(
-        [
-            InlineKeyboardButton('Корзина', callback_data=str(CART)),
-        ],
-    )
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text(
-        text='Показываем рыбов:',
-        reply_markup=reply_markup
-    )
-    return States.handle_menu
-
-
-def start_over(update: Update, context: CallbackContext, base_url, api_key) -> int:
+def start(update: Update, context: CallbackContext, base_url, api_key) -> int:
     query = update.callback_query
-    query.answer()
+
     products = get_products(base_url, api_key)
     keyboard = [
         [InlineKeyboardButton(product['attributes']['name'], callback_data=product['id'])]
@@ -79,11 +60,18 @@ def start_over(update: Update, context: CallbackContext, base_url, api_key) -> i
         ],
     )
     reply_markup = InlineKeyboardMarkup(keyboard)
-    query.message.reply_text(
-        text='Показываем рыбов:',
-        reply_markup=reply_markup
-    )
-    query.message.delete()
+    if query:
+        query.answer()
+        query.message.reply_text(
+            text='Показываем рыбов:',
+            reply_markup=reply_markup
+        )
+        query.message.delete()
+    else:
+        update.message.reply_text(
+            text='Показываем рыбов:',
+            reply_markup=reply_markup
+        )
 
     return States.handle_menu
 
@@ -283,7 +271,7 @@ def main():
             ],
             States.handle_description: [
                 CallbackQueryHandler(
-                    partial(start_over, base_url=moltin_base_url, api_key=api_key),
+                    partial(start, base_url=moltin_base_url, api_key=api_key),
                     pattern=f'^{Transitions.menu}$'
                 ),
                 CallbackQueryHandler(
@@ -296,7 +284,7 @@ def main():
             ],
             States.handle_cart: [
                 CallbackQueryHandler(
-                    partial(start_over, base_url=moltin_base_url, api_key=api_key),
+                    partial(start, base_url=moltin_base_url, api_key=api_key),
                     pattern=f'^{Transitions.menu}$'
                 ),
                 CallbackQueryHandler(
@@ -309,7 +297,7 @@ def main():
             ],
             States.waiting_email: [
                 CallbackQueryHandler(
-                    partial(start_over, base_url=moltin_base_url, api_key=api_key),
+                    partial(start, base_url=moltin_base_url, api_key=api_key),
                     pattern=f'^{Transitions.menu}$'
                 ),
                 CallbackQueryHandler(
