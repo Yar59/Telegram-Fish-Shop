@@ -1,5 +1,5 @@
-import enum
 import logging
+from enum import Enum, auto
 from textwrap import dedent
 from functools import partial
 
@@ -31,23 +31,19 @@ from moltin_tools import (
 logger = logging.getLogger(__name__)
 
 
-class States(enum.Enum):
-    (
-        start,
-        handle_menu,
-        handle_description,
-        handle_cart,
-        waiting_email,
-    ) = range(5)
+class States(Enum):
+    start = auto()
+    handle_menu = auto()
+    handle_description = auto()
+    handle_cart = auto()
+    waiting_email = auto()
 
 
-class Transitions(enum.Enum):
-    (
-        menu,
-        description,
-        cart,
-        order,
-    ) = range(4)
+class Transitions(Enum):
+    menu = auto()
+    description = auto()
+    cart = auto()
+    order = auto()
 
 
 def start(update: Update, context: CallbackContext, base_url, api_key):
